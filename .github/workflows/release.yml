@@ -35,9 +35,13 @@ jobs:
       - name: Publish self-contained EXE
         shell: pwsh
         run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          if ($version.Split('.').Count -eq 3) { $version = "$version.0" }
+          echo "VERSION=$version" >> $env:GITHUB_ENV
           dotnet publish src/LlamaMate.App/LlamaMate.App.csproj `
             -c Release -r win-x64 --self-contained true `
-            -p:PublishSingleFile=true -p:Version="1.0.0.0"
+            -p:PublishSingleFile=true -p:Version=$version
           $publishDir = "src\LlamaMate.App\bin\Release\net8.0-windows\win-x64\publish"
           Write-Host "Published to: $publishDir"
           Get-ChildItem $publishDir | Select-Object Name, Length
@@ -49,7 +53,7 @@ jobs:
         run: |
           $msixScript = ".\packaging\make-msix.ps1"
           if (Test-Path $msixScript) {
-            & $msixScript -Configuration Release -Version "1.0.0.0"
+            & $msixScript -Configuration Release -Version $env:VERSION
           } else {
             Write-Host "::warning::make-msix.ps1 not found, skipping MSIX"
           }
@@ -65,14 +69,17 @@ jobs:
       - name: Prepare release artifacts
         shell: pwsh
         run: |
+          $ver = $env:VERSION.TrimEnd('.0')
+          $versionShort = $ver -replace '\.0$',''
+          Write-Host "Version: $versionShort"
           New-Item -ItemType Directory -Path "./release-artifacts" -Force | Out-Null
           $publishDir = "src\LlamaMate.App\bin\Release\net8.0-windows\win-x64\publish"
 
           # Copy EXE artifact
-          Copy-Item -Path "$publishDir\LlamaMate.exe" -Destination "./release-artifacts/LlamaMate-1.0.0.exe"
+          Copy-Item -Path "$publishDir\LlamaMate.exe" -Destination "./release-artifacts/LlamaMate-$versionShort.exe"
 
           # Copy SHA256
-          Copy-Item -Path "exe-sha256.txt" -Destination "./release-artifacts/LlamaMate-1.0.0.exe.sha256"
+          Copy-Item -Path "exe-sha256.txt" -Destination "./release-artifacts/LlamaMate-$versionShort.exe.sha256"
 
           # Copy Run-LlamaMate starter (bypasses SmartScreen)
           if (Test-Path "packaging/Run-LlamaMate.ps1") {
