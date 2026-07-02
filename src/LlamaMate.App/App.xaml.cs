@@ -165,7 +165,7 @@ public partial class App : Application
         }
     }
 
-    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    [System.Runtime.InteropServices.DllImport("gdi32.dll", SetLastError = true)]
     private static extern bool DeleteObject(System.IntPtr hObject);
 
     private void BuildTrayMenu()
