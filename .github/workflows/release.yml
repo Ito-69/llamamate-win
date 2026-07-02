@@ -162,6 +162,7 @@ jobs:
             release-artifacts/*.exe
             release-artifacts/*.msix
             release-artifacts/*.sha256
+            release-artifacts/*.ps1
           draft: false
           prerelease: false
           fail_on_unmatched_files: false
