@@ -74,6 +74,11 @@ jobs:
           # Copy SHA256
           Copy-Item -Path "exe-sha256.txt" -Destination "./release-artifacts/LlamaMate-1.0.0.exe.sha256"
 
+          # Copy Run-LlamaMate starter (bypasses SmartScreen)
+          if (Test-Path "packaging/Run-LlamaMate.ps1") {
+            Copy-Item -Path "packaging/Run-LlamaMate.ps1" -Destination "./release-artifacts/Run-LlamaMate.ps1"
+          }
+
           # Copy MSIX if it was created
           Get-ChildItem "packaging/output/*.msix" -ErrorAction SilentlyContinue | ForEach-Object {
             Copy-Item -Path $_.FullName -Destination "./release-artifacts/$($_.Name)"
@@ -120,22 +125,24 @@ jobs:
 
           ### Download
           - **LlamaMate-$version.exe** \u2014 self-contained portable executable (recommended for testing)
+          - **Run-LlamaMate.ps1** \u2014 PowerShell starter (bypasses SmartScreen)
           - **LlamaMate-$version.msix** \u2014 Windows app package $(if ($hasMsix) { '' } else { '(not included in this build)' })
 
-          ### Quick start (portable EXE)
-          1. Download `LlamaMate-$version.exe`
-          2. Double-click to run
-          3. On first launch, the app will offer to install `llama.cpp` and a small test model
-          4. The app lives in the system tray
+          ### Quick start (recommended)
+          1. Download `LlamaMate-$version.exe` and `Run-LlamaMate.ps1` in the same folder
+          2. Right-click `Run-LlamaMate.ps1` \u2192 "Run with PowerShell"
+          3. The app will start automatically. On first launch, it will offer to install `llama.cpp` and a small test model.
 
-          ### Install via winget (when MSIX is published)
-          ```powershell
-          winget install Ito-69.LlamaMate
-          ```
+          ### Quick start (manual unblock)
+          1. Download `LlamaMate-$version.exe`
+          2. Right-click the file \u2192 **Properties** \u2192 check **"Unblock"** \u2192 OK
+          3. Double-click to run
 
           ### Requirements
           - Windows 10 or later (x64)
           - Internet connection for first-time llama.cpp + model download
+
+          > **Note on SmartScreen**: The portable EXE is not digitally signed. Windows may show a SmartScreen warning. The `Run-LlamaMate.ps1` starter script handles this for you, or you can unblock the file manually as described above.
           "@
           Set-Content -Path "release-body.md" -Value $body
 
