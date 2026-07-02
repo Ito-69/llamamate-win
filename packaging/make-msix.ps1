@@ -47,7 +47,8 @@ Write-Host "Building LlamaMate MSIX v$Version (Configuration: $Configuration)" -
 # Step 1: dotnet publish
 Write-Host "`nStep 1: Publishing application..." -ForegroundColor Cyan
 
-$publishDir = Join-Path $RepoRoot "src\LlamaMate.App\bin\$Configuration\win-x64\publish"
+$tfm = "net8.0-windows"
+$publishDir = Join-Path $RepoRoot "src\LlamaMate.App\bin\$Configuration\$tfm\win-x64\publish"
 
 $null = Remove-Item -Path $publishDir -Recurse -Force -ErrorAction SilentlyContinue
 

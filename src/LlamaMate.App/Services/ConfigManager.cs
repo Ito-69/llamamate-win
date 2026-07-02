@@ -19,6 +19,7 @@ public class ServerSettings
     public string KvCacheQuant { get; set; } = "f16";
     public string ExtraArgs { get; set; } = "";
     public bool AutoStart { get; set; } = false;
+    public bool WelcomeDone { get; set; } = false;
 }
 
 public class ConfigManager

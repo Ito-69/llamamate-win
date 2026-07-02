@@ -14,6 +14,30 @@ public class ServerManager
 
     public bool IsRunning => _serverProcess is { HasExited: false };
 
+    public event EventHandler? StatusChanged;
+
+    public bool IsServerInstalled
+    {
+        get
+        {
+            var binDir = _config.BinDir();
+            var exe = Path.Combine(binDir, "llama-server.exe");
+            if (File.Exists(exe)) return true;
+            return GetSystemPathExe() != null;
+        }
+    }
+
+    private static string? GetSystemPathExe()
+    {
+        var paths = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';');
+        foreach (var dir in paths)
+        {
+            var candidate = Path.Combine(dir.Trim(), "llama-server.exe");
+            if (File.Exists(candidate)) return candidate;
+        }
+        return null;
+    }
+
     public ServerManager(ConfigManager config, LogTailer logTailer)
     {
         _config = config;
@@ -30,8 +54,16 @@ public class ServerManager
         var serverExe = Path.Combine(binDir, "llama-server.exe");
         if (!File.Exists(serverExe))
         {
-            // fallback: check PATH
-            serverExe = "llama-server.exe";
+            var pathExe = GetSystemPathExe();
+            if (pathExe != null)
+            {
+                serverExe = pathExe;
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    "llama-server.exe not found. Click \"Install llama.cpp...\" to download it.");
+            }
         }
 
         var cfg = _config.Settings;
@@ -80,6 +112,8 @@ public class ServerManager
 
         _logTailer.Start();
 
+        StatusChanged?.Invoke(this, EventArgs.Empty);
+
         await Task.CompletedTask;
     }
 
@@ -106,6 +140,8 @@ public class ServerManager
 
         // also try stopping via PowerShell in case it was started by Task Scheduler
         await RunPowerShellAsync("Stop-Server.ps1");
+
+        StatusChanged?.Invoke(this, EventArgs.Empty);
 
         await Task.CompletedTask;
     }

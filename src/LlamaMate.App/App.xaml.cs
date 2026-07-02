@@ -2,7 +2,6 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Windows;
-using Hardcodet.Wpf.TaskbarNotification;
 using LlamaMate.App.Services;
 using LlamaMate.App.Views;
 
@@ -11,7 +10,8 @@ namespace LlamaMate.App;
 public partial class App : Application
 {
     private Mutex? _mutex;
-    private TaskbarIcon? _trayIcon;
+    private System.Windows.Forms.NotifyIcon? _trayIcon;
+    private System.Windows.Forms.ContextMenuStrip? _trayMenu;
     private ModelsWindow? _modelsWindow;
     private SettingsWindow? _settingsWindow;
     private LogViewerWindow? _logViewerWindow;
@@ -31,6 +31,7 @@ public partial class App : Application
         LogTailer = new LogTailer(ConfigManager);
         UpdateManager = new UpdateManager();
         ServerManager = new ServerManager(ConfigManager, LogTailer);
+        ServerManager.StatusChanged += (_, _) => Dispatcher.Invoke(UpdateTrayStatus);
     }
 
     protected override void OnStartup(StartupEventArgs e)
@@ -52,6 +53,22 @@ public partial class App : Application
 
         ConfigManager.Load();
 
+        System.Windows.Forms.Application.EnableVisualStyles();
+
+        if (!ServerManager.IsServerInstalled && !ConfigManager.Settings.WelcomeDone)
+        {
+            var welcome = new Views.WelcomeWindow(this);
+            var result = welcome.ShowDialog();
+
+            if (result == false)
+            {
+                Shutdown();
+                return;
+            }
+
+            ConfigManager.Load();
+        }
+
         CreateTrayIcon();
         base.OnStartup(e);
     }
@@ -69,101 +86,210 @@ public partial class App : Application
 
     private void CreateTrayIcon()
     {
-        var iconStream = Assembly.GetExecutingAssembly()
-            .GetManifestResourceStream("LlamaMate.App.Assets.llama.ico");
-        if (iconStream == null)
+        _trayMenu = new System.Windows.Forms.ContextMenuStrip();
+        BuildTrayMenu();
+
+        _trayIcon = new System.Windows.Forms.NotifyIcon
         {
-            iconStream = new MemoryStream(GetFallbackIcoBytes());
+            Icon = CreateIcon(running: false),
+            Text = "LlamaMate",
+            ContextMenuStrip = _trayMenu,
+            Visible = true
+        };
+
+        _trayIcon.MouseClick += (_, args) =>
+        {
+            if (args.Button == System.Windows.Forms.MouseButtons.Left)
+                OpenWebUI();
+        };
+    }
+
+    private static System.Drawing.Icon CreateIcon(bool running)
+    {
+        using (var stream = Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream("LlamaMate.App.Assets.llama-cpp.png"))
+        {
+            if (stream != null)
+            {
+                using (var img = System.Drawing.Image.FromStream(stream))
+                {
+                    var bmp = new System.Drawing.Bitmap(img, 32, 32);
+                    if (!running) ApplyGrayscale(bmp);
+                    var h = bmp.GetHicon();
+                    var icon = (System.Drawing.Icon)System.Drawing.Icon.FromHandle(h).Clone();
+                    bmp.Dispose();
+                    DeleteObject(h);
+                    return icon;
+                }
+            }
         }
 
-        _trayIcon = new TaskbarIcon
+        using (var fallbackBmp = new System.Drawing.Bitmap(32, 32))
+        using (var g = System.Drawing.Graphics.FromImage(fallbackBmp))
         {
-            Icon = new System.Drawing.Icon(iconStream),
-            ToolTipText = "LlamaMate",
-            ContextMenu = BuildTrayMenu()
-        };
-
-        _trayIcon.TrayMouseDoubleClick += (_, _) => OpenWebUI();
+            g.Clear(System.Drawing.Color.Transparent);
+            var brushColor = running
+                ? System.Drawing.Color.FromArgb(0, 120, 212)
+                : System.Drawing.Color.FromArgb(160, 160, 160);
+            using (var brush = new System.Drawing.SolidBrush(brushColor))
+            using (var pen = new System.Drawing.Pen(System.Drawing.Color.White, 1.5f))
+            using (var font = new System.Drawing.Font("Segoe UI", 14, System.Drawing.FontStyle.Bold))
+            {
+                g.FillEllipse(brush, 4, 4, 24, 24);
+                g.DrawEllipse(pen, 4, 4, 24, 24);
+                g.DrawString("LM", font, System.Drawing.Brushes.White, 5, 5);
+            }
+            var h = fallbackBmp.GetHicon();
+            var icon = (System.Drawing.Icon)System.Drawing.Icon.FromHandle(h).Clone();
+            DeleteObject(h);
+            return icon;
+        }
     }
 
-    private System.Windows.Controls.ContextMenu BuildTrayMenu()
+    private static void ApplyGrayscale(System.Drawing.Bitmap bmp)
     {
-        var menu = new System.Windows.Controls.ContextMenu();
-
-        var currentModelItem = new System.Windows.Controls.MenuItem
+        var matrix = new System.Drawing.Imaging.ColorMatrix(new float[][]
         {
-            Header = GetCurrentModelDisplay(),
-            IsEnabled = false,
-            FontWeight = FontWeights.SemiBold
-        };
-        menu.Items.Add(currentModelItem);
-        menu.Items.Add(new System.Windows.Controls.Separator());
-
-        AddMenuItem(menu, "_Open WebUI", "Ctrl+O", (_, _) => OpenWebUI());
-        AddMenuItem(menu, "_Restart Server", "Ctrl+R", async (_, _) => await RestartServer());
-        AddMenuItem(menu, "_Stop Server", "", async (_, _) => await StopServer());
-        menu.Items.Add(new System.Windows.Controls.Separator());
-
-        AddMenuItem(menu, "_Models\u2026", "Ctrl+M", (_, _) => ShowModelsWindow());
-        AddMenuItem(menu, "Server _Settings\u2026", "", (_, _) => ShowSettingsWindow());
-        AddMenuItem(menu, "_View Server Logs\u2026", "", (_, _) => ShowLogViewer());
-        AddMenuItem(menu, "Check for _App Update\u2026", "", async (_, _) => await CheckAppUpdate());
-        AddMenuItem(menu, "Check for llama.cpp _Update\u2026", "", async (_, _) => await CheckLlamacppUpdate());
-        menu.Items.Add(new System.Windows.Controls.Separator());
-
-        var launchAtLoginItem = new System.Windows.Controls.MenuItem
+            new float[] { 0.299f, 0.299f, 0.299f, 0, 0 },
+            new float[] { 0.587f, 0.587f, 0.587f, 0, 0 },
+            new float[] { 0.114f, 0.114f, 0.114f, 0, 0 },
+            new float[] { 0,       0,       0,       1, 0 },
+            new float[] { 0,       0,       0,       0, 1 }
+        });
+        var attrs = new System.Drawing.Imaging.ImageAttributes();
+        attrs.SetColorMatrix(matrix);
+        var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
         {
-            Header = "_Launch at Login",
-            IsCheckable = true,
-            IsChecked = ConfigManager.Settings.AutoStart
-        };
-        launchAtLoginItem.Checked += async (_, _) => await ToggleAutoStart(true);
-        launchAtLoginItem.Unchecked += async (_, _) => await ToggleAutoStart(false);
-        menu.Items.Add(launchAtLoginItem);
-        menu.Items.Add(new System.Windows.Controls.Separator());
-
-        AddMenuItem(menu, "_Uninstall\u2026", "", async (_, _) => await Uninstall());
-        AddMenuItem(menu, "_About LlamaMate", "", (_, _) => ShowAbout());
-        AddMenuItem(menu, "_Quit", "Ctrl+Q", (_, _) => Quit());
-
-        return menu;
+            g.DrawImage(bmp, rect, 0, 0, bmp.Width, bmp.Height, System.Drawing.GraphicsUnit.Pixel, attrs);
+        }
     }
 
-    private static void AddMenuItem(
-        System.Windows.Controls.ContextMenu menu,
-        string header,
-        string shortcut,
-        RoutedEventHandler handler)
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DeleteObject(System.IntPtr hObject);
+
+    private void BuildTrayMenu()
     {
-        var item = new System.Windows.Controls.MenuItem
+        _trayMenu!.Items.Clear();
+
+        var installed = ServerManager.IsServerInstalled;
+        var running = ServerManager.IsRunning;
+
+        AddMenuItem("", GetCurrentModelDisplay(), null, false);
+
+        _trayMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+
+        AddMenuItem("Open WebUI", null, (_, _) => OpenWebUI());
+
+        if (installed)
         {
-            Header = string.IsNullOrEmpty(shortcut) ? header : $"{header}\t{shortcut}",
-            InputGestureText = shortcut
+            if (running)
+            {
+                AddMenuItem("Stop Server", null, async (_, _) => await StopServer());
+                AddMenuItem("Restart Server", "Ctrl+R", async (_, _) => await RestartServer());
+            }
+            else
+            {
+                AddMenuItem("Start Server", null, async (_, _) => await StartServer());
+            }
+        }
+        else
+        {
+            AddMenuItem("Install llama.cpp\u2026", "Ctrl+I", async (_, _) => await InstallLlamacpp());
+        }
+
+        _trayMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+
+        AddMenuItem("Models\u2026", "Ctrl+M", (_, _) => ShowModelsWindow());
+        AddMenuItem("Server Settings\u2026", null, (_, _) => ShowSettingsWindow());
+        AddMenuItem("View Server Logs\u2026", null, (_, _) => ShowLogViewer());
+        AddMenuItem("Check for App Update\u2026", null, async (_, _) => await CheckAppUpdate());
+
+        if (installed)
+            AddMenuItem("Check for llama.cpp Update\u2026", null, async (_, _) => await CheckLlamacppUpdate());
+
+        _trayMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+
+        var launchItem = new System.Windows.Forms.ToolStripMenuItem("Launch at Login")
+        {
+            Checked = ConfigManager.Settings.AutoStart,
+            CheckOnClick = true
         };
-        item.Click += handler;
-        menu.Items.Add(item);
+        launchItem.CheckedChanged += async (_, _) => await ToggleAutoStart(launchItem.Checked);
+        _trayMenu.Items.Add(launchItem);
+
+        _trayMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+
+        AddMenuItem("Uninstall\u2026", null, async (_, _) => await Uninstall());
+        AddMenuItem("About LlamaMate", null, (_, _) => ShowAbout());
+        AddMenuItem("Quit", "Ctrl+Q", (_, _) => Quit());
+    }
+
+    private void AddMenuItem(string text, string? shortcut, EventHandler? handler, bool enabled = true)
+    {
+        var label = shortcut != null ? $"{text}    {shortcut}" : text;
+        var item = new System.Windows.Forms.ToolStripMenuItem(label)
+        {
+            Enabled = enabled
+        };
+        if (handler != null)
+            item.Click += handler;
+        _trayMenu!.Items.Add(item);
     }
 
     private string GetCurrentModelDisplay()
     {
         var model = ConfigManager.Settings.ActiveModel;
         if (string.IsNullOrEmpty(model))
-            return "\u26AA No model selected";
-        var status = ServerManager.IsRunning ? "\uD83D\uDFE2" : "\u26AA";
-        return $"{status} {Path.GetFileNameWithoutExtension(model)}";
+            return "No model selected";
+        return Path.GetFileNameWithoutExtension(model);
     }
 
     public void UpdateTrayStatus()
     {
-        if (_trayIcon == null) return;
+        if (_trayIcon == null || _trayMenu == null) return;
 
-        var display = GetCurrentModelDisplay();
-        if (_trayIcon.ContextMenu?.Items[0] is System.Windows.Controls.MenuItem item)
+        var status = ServerManager.IsRunning ? "running" : "stopped";
+        _trayIcon.Text = $"LlamaMate - {GetCurrentModelDisplay()} ({status})";
+        _trayIcon.Icon = CreateIcon(running: ServerManager.IsRunning);
+        RefreshTrayMenu();
+    }
+
+    private void RefreshTrayMenu()
+    {
+        if (_trayMenu == null) return;
+        BuildTrayMenu();
+    }
+
+    private async Task InstallLlamacpp()
+    {
+        var result = MessageBox.Show(
+            "llama-server.exe not found. Download the latest llama.cpp for Windows?",
+            "Install llama.cpp", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        try
         {
-            item.Header = display;
+            var update = await UpdateManager.CheckForLlamacppUpdate();
+            if (update == null)
+            {
+                MessageBox.Show("Could not find a llama.cpp release. Check your internet connection.",
+                    "Install llama.cpp", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            await UpdateManager.DownloadLlamacppUpdate(update);
+            MessageBox.Show($"llama.cpp {update.TagName} installed successfully!",
+                "Install llama.cpp", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to install llama.cpp:\n{ex.Message}",
+                "Install llama.cpp", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
-        _trayIcon.ToolTipText = $"LlamaMate - {display}";
+        RefreshTrayMenu();
     }
 
     private void OpenWebUI()
@@ -173,16 +299,38 @@ public partial class App : Application
         ShellRunner.OpenUrl(url);
     }
 
+    private async Task StartServer()
+    {
+        try
+        {
+            await ServerManager.Start();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "LlamaMate",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        RefreshTrayMenu();
+    }
+
     private async Task RestartServer()
     {
-        await ServerManager.Restart();
-        UpdateTrayStatus();
+        try
+        {
+            await ServerManager.Restart();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "LlamaMate",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        RefreshTrayMenu();
     }
 
     private async Task StopServer()
     {
         await ServerManager.Stop();
-        UpdateTrayStatus();
+        RefreshTrayMenu();
     }
 
     private void ShowModelsWindow()
@@ -280,13 +428,43 @@ public partial class App : Application
             "Uninstall LlamaMate? This will remove the application and server files, but keep your models.",
             "Uninstall LlamaMate", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
-        if (result == MessageBoxResult.Yes)
+        if (result != MessageBoxResult.Yes) return;
+
+        try
         {
             await ServerManager.Stop();
             await ServerManager.UnregisterScheduledTask();
-            ShellRunner.RunPowerShell("Uninstall-LlamaMate.ps1 -KeepModels");
-            Quit();
+
+            var scriptPath = Path.Combine(Path.GetTempPath(), "LlamaMate-Uninstall.ps1");
+            using (var stream = Assembly.GetExecutingAssembly()
+                .GetManifestResourceStream("LlamaMate.App.Scripts.Uninstall-LlamaMate.ps1"))
+            {
+                if (stream == null)
+                    throw new Exception("Uninstall script not found in resources.");
+
+                using var fs = File.Create(scriptPath);
+                stream.CopyTo(fs);
+            }
+
+            var (stdout, stderr, exit) = ShellRunner.RunPowerShell(
+                $"& '{scriptPath}' -KeepModels");
+
+            try { File.Delete(scriptPath); } catch { }
+
+            if (exit != 0)
+            {
+                MessageBox.Show($"Uninstall completed with warnings.\n\n{stderr}",
+                    "Uninstall", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Uninstall error: {ex.Message}",
+                "Uninstall", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        Quit();
     }
 
     private static void ShowAbout()
@@ -302,24 +480,5 @@ public partial class App : Application
         ServerManager.Cleanup();
         LogTailer.Stop();
         Shutdown();
-    }
-
-    private static byte[] GetFallbackIcoBytes()
-    {
-        using var ms = new MemoryStream();
-        using var bw = new BinaryWriter(ms);
-        bw.Write((short)0);
-        bw.Write((short)1);
-        bw.Write((short)1);
-        bw.Write((short)32);
-        bw.Write((short)32);
-        bw.Write((byte)0);
-        bw.Write((byte)0);
-        bw.Write(0);
-        bw.Write(22);
-        bw.Write(0);
-        bw.Write(0);
-        for (int i = 0; i < 22; i++) bw.Write((byte)0);
-        return ms.ToArray();
     }
 }

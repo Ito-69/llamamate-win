@@ -74,15 +74,22 @@ function Install-LlamaCpp {
 
     try {
         # Fetch latest release
-        $releaseUrl = "https://api.github.com/repos/ggml-ai/llama.cpp/releases/latest"
+        $releaseUrl = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
         $release = Invoke-RestMethod -Uri $releaseUrl -UseBasicParsing
         $tagName = $release.tag_name
         Write-Host "  Latest release: $tagName" -ForegroundColor Yellow
 
-        # Find the CPU-only Windows build
-        $asset = $release.assets | Where-Object { $_.name -like "*win*" -and $_.name -like "*cpu*" -and $_.name -like "*.zip" } | Select-Object -First 1
+        # Find the CPU-only Windows build matching the current architecture
+        $isX64 = [Environment]::Is64BitOperatingSystem
+        $arch = if ($env:PROCESSOR_ARCHITECTURE -match 'ARM') { 'arm64' } else { 'x64' }
+        $preferredPattern = "win-cpu-$arch.zip"
+
+        $asset = $release.assets | Where-Object { $_.name -like $preferredPattern } | Select-Object -First 1
         if (-not $asset) {
-            # Fallback: CUDA build
+            $asset = $release.assets | Where-Object { $_.name -like "*win-cpu*" -and $_.name -like "*.zip" } | Select-Object -First 1
+        }
+        if (-not $asset) {
+            # Fallback: any Windows zip
             $asset = $release.assets | Where-Object { $_.name -like "*win*" -and $_.name -like "*.zip" } | Select-Object -First 1
         }
         if (-not $asset) {

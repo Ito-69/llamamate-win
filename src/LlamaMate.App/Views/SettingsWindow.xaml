@@ -4,7 +4,7 @@
         Title="LlamaMate Server Settings"
         Height="550" Width="500"
         WindowStartupLocation="CenterScreen"
-        Icon="/Assets/llama.ico">
+>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

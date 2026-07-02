@@ -4,7 +4,7 @@
         Title="LlamaMate Server Logs"
         Height="500" Width="800"
         WindowStartupLocation="CenterScreen"
-        Icon="/Assets/llama.ico">
+>
     <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

@@ -90,7 +90,7 @@ public class UpdateManager
     {
         try
         {
-            var url = "https://api.github.com/repos/ggml-ai/llama.cpp/releases/latest";
+            var url = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest";
             var response = await _http.GetStringAsync(url);
             var release = JsonConvert.DeserializeObject<JObject>(response);
             if (release == null) return null;
@@ -101,14 +101,28 @@ public class UpdateManager
             var assets = release["assets"] as JArray;
             if (assets == null) return null;
 
+            var arch = IsX64() ? "x64" : "arm64";
+            var preferred = $"win-cpu-{arch}.zip";
             string? downloadUrl = null;
             foreach (var asset in assets)
             {
                 var name = asset["name"]?.ToString() ?? "";
-                if (name.Contains("win") && name.Contains("cpu") && name.EndsWith(".zip"))
+                if (name.EndsWith(preferred, StringComparison.OrdinalIgnoreCase))
                 {
                     downloadUrl = asset["browser_download_url"]?.ToString();
                     break;
+                }
+            }
+            if (downloadUrl == null)
+            {
+                foreach (var asset in assets)
+                {
+                    var name = asset["name"]?.ToString() ?? "";
+                    if (name.Contains("win-cpu") && name.EndsWith(".zip"))
+                    {
+                        downloadUrl = asset["browser_download_url"]?.ToString();
+                        break;
+                    }
                 }
             }
 
@@ -125,6 +139,12 @@ public class UpdateManager
         {
             return null;
         }
+    }
+
+    private static bool IsX64()
+    {
+        var arch = Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE") ?? "";
+        return arch.Contains("64") && !arch.Contains("ARM", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<string?> DownloadUpdate(UpdateInfo update)
@@ -155,16 +175,79 @@ public class UpdateManager
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "LlamaMate", "bin");
 
-        var tempZip = Path.Combine(Path.GetTempPath(), "llama-cpp.zip");
+        var tempZip = Path.Combine(Path.GetTempPath(), $"llama-cpp-{Guid.NewGuid():N}.zip");
 
-        using var response = await _http.GetAsync(release.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
+        try
+        {
+            Directory.CreateDirectory(binDir);
+
+            using var dlClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+            dlClient.DefaultRequestHeaders.Add("User-Agent", "LlamaMate/2.3");
+
+            using var response = await dlClient.GetAsync(release.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+
+            await using (var fs = new FileStream(tempZip, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await response.Content.CopyToAsync(fs);
+            }
+
+            // Wait a moment in case AV is scanning the zip
+            await Task.Delay(500);
+
+            // Extract - delete existing files first to avoid locks
+            if (File.Exists(Path.Combine(binDir, "llama-server.exe")))
+            {
+                try { File.Delete(Path.Combine(binDir, "llama-server.exe")); } catch { }
+            }
+
+            System.IO.Compression.ZipFile.ExtractToDirectory(tempZip, binDir, overwriteFiles: true);
+        }
+        finally
+        {
+            try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch { }
+        }
+    }
+
+    public static bool IsVcRuntimeInstalled()
+    {
+        var system32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
+        return File.Exists(Path.Combine(system32, "VCRUNTIME140_1.dll"))
+            && File.Exists(Path.Combine(system32, "VCRUNTIME140.dll"))
+            && File.Exists(Path.Combine(system32, "msvcp140.dll"));
+    }
+
+    public async Task<string> DownloadVcRedist()
+    {
+        var tempExe = Path.Combine(Path.GetTempPath(), $"vc_redist.x64-{Guid.NewGuid():N}.exe");
+
+        using var dlClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        dlClient.DefaultRequestHeaders.Add("User-Agent", "LlamaMate/2.3");
+
+        using var response = await dlClient.GetAsync(
+            "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+            HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
 
-        await using var fs = new FileStream(tempZip, FileMode.Create, FileAccess.Write, FileShare.None);
-        await response.Content.CopyToAsync(fs);
+        await using (var fs = new FileStream(tempExe, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            await response.Content.CopyToAsync(fs);
+        }
 
-        // Extract
-        System.IO.Compression.ZipFile.ExtractToDirectory(tempZip, binDir, overwriteFiles: true);
-        File.Delete(tempZip);
+        return tempExe;
+    }
+
+    public static int InstallVcRedistSilent(string redistExePath)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = redistExePath,
+            Arguments = "/install /quiet /norestart",
+            UseShellExecute = true,
+            Verb = "runas"
+        };
+        using var p = System.Diagnostics.Process.Start(psi);
+        p?.WaitForExit(180_000);
+        return p?.ExitCode ?? -1;
     }
 }

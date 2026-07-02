@@ -4,7 +4,7 @@
         Title="LlamaMate Models"
         Height="600" Width="800"
         WindowStartupLocation="CenterScreen"
-        Icon="/Assets/llama.ico">
+>
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

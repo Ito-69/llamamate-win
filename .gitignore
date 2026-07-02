@@ -2,7 +2,7 @@
 bin/
 obj/
 packaging/output/
-packaging/cert/*.pfx
+packaging/cert/
 
 # User-specific files
 *.suo
@@ -31,3 +31,11 @@ packages/
 # MSIX
 *.msix
 *.msix.sha256
+
+# PowerShell
+*.ps1.bak
+
+# Temp
+*.tmp
+*.temp
+~$*

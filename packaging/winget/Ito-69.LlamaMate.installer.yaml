@@ -1,5 +1,5 @@
 PackageIdentifier: Ito-69.LlamaMate
-PackageVersion: 2.3.0
+PackageVersion: 1.0.0
 InstallerLocale: en-US
 Platform:
   - Windows.Desktop
@@ -19,7 +19,7 @@ Dependencies:
 PackageFamilyName: LlamaMate_8wekyb3d8bbwe
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/Ito-69/llamamate-win/releases/download/v2.3.0/LlamaMate-2.3.0.msix
+    InstallerUrl: https://github.com/Ito-69/llamamate-win/releases/download/v1.0.0/LlamaMate-1.0.0.msix
     InstallerSha256: PLACEHOLDER_UPDATED_BY_CI
     SignatureSha256: PLACEHOLDER_UPDATED_BY_CI
 ManifestType: installer

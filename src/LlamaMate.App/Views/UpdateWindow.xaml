@@ -5,7 +5,7 @@
         Height="300" Width="450"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
-        Icon="/Assets/llama.ico">
+>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
