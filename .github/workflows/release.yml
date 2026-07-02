@@ -32,6 +32,21 @@ jobs:
       - name: Build
         run: dotnet build src/LlamaMate.App/LlamaMate.App.csproj -c Release -r win-x64 --no-restore
 
+      - name: Install Windows SDK (for makeappx.exe)
+        shell: pwsh
+        run: |
+          # Install Windows 10 SDK via choco (provides makeappx.exe and signtool.exe)
+          choco install --no-progress windows-sdk-10-version-2104 -y
+          # Refresh PATH so the new tools are visible
+          $sdkBin = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -ErrorAction SilentlyContinue |
+                    Where-Object { $_.PSIsContainer } |
+                    Sort-Object Name -Descending |
+                    Select-Object -First 1
+          if ($sdkBin) {
+            $envPath = $env:Path + ";" + (Join-Path $sdkBin.FullName "x64")
+            Write-Host "SDK bin: $($sdkBin.FullName)\x64"
+          }
+
       - name: Create MSIX package
         shell: pwsh
         run: |
