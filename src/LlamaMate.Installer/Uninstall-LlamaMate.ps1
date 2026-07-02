@@ -46,7 +46,7 @@ Write-Host "  Removing from PATH..." -ForegroundColor Yellow
 try {
     $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
     if ($userPath) {
-        $entries = $userPath -split ";" | Where-Object { $_ -ne $BinDir -and $_ -ne $AppDir\bin }
+        $entries = $userPath -split ";" | Where-Object { $_ -ne $BinDir -and $_ -ne "$AppDir\bin" }
         $newPath = $entries -join ";"
         [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
         Write-Host "    PATH entry removed" -ForegroundColor Gray
