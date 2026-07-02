@@ -31,7 +31,13 @@ public partial class App : Application
         LogTailer = new LogTailer(ConfigManager);
         UpdateManager = new UpdateManager();
         ServerManager = new ServerManager(ConfigManager, LogTailer);
-        ServerManager.StatusChanged += (_, _) => Dispatcher.Invoke(UpdateTrayStatus);
+        ServerManager.StatusChanged += (_, _) =>
+        {
+            Dispatcher.Invoke(UpdateTrayStatus);
+            // Re-check after a short delay, in case IsRunning hasn't propagated yet
+            Task.Delay(500).ContinueWith(_ => Dispatcher.Invoke(UpdateTrayStatus));
+            Task.Delay(2000).ContinueWith(_ => Dispatcher.Invoke(UpdateTrayStatus));
+        };
     }
 
     protected override void OnStartup(StartupEventArgs e)
