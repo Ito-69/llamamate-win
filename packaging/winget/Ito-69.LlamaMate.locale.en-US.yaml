@@ -1,0 +1,24 @@
+PackageIdentifier: Ito-69.LlamaMate
+PackageVersion: 2.3.0
+PackageLocale: en-US
+Publisher: Ito-69
+PublisherUrl: https://github.com/Ito-69
+PublisherSupportUrl: https://github.com/Ito-69/llamamate-win/issues
+Author: Ito-69
+PackageName: LlamaMate
+PackageUrl: https://github.com/Ito-69/llamamate-win
+License: MIT
+LicenseUrl: https://github.com/Ito-69/llamamate-win/blob/main/LICENSE
+ShortDescription: Local LLM server manager for llama.cpp on Windows
+Description: LlamaMate is a tray application that manages a local llama.cpp server. Download models from Hugging Face, configure server settings, and start/stop the server — all from the system tray.
+Moniker: llamamate
+Tags:
+  - llama
+  - llama.cpp
+  - llm
+  - ai
+  - local
+  - gguf
+  - huggingface
+ManifestType: defaultLocale
+ManifestVersion: 1.5.0

@@ -1,0 +1,36 @@
+<Window x:Class="LlamaMate.App.Views.LogViewerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="LlamaMate Server Logs"
+        Height="500" Width="800"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/llama.ico">
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Server Logs" Style="{StaticResource SectionHeader}" />
+
+        <Border Grid.Row="1" BorderBrush="#CCC" BorderThickness="1" CornerRadius="4" Margin="0,4">
+            <ScrollViewer x:Name="LogScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                <TextBox x:Name="LogContent" FontFamily="Cascadia Code, Consolas, Courier New" FontSize="12"
+                         IsReadOnly="True" TextWrapping="NoWrap"
+                         Background="#1E1E1E" Foreground="#D4D4D4"
+                         Padding="8"
+                         VerticalScrollBarVisibility="Hidden"
+                         HorizontalScrollBarVisibility="Hidden" />
+            </ScrollViewer>
+        </Border>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="OpenInExplorerButton" Content="Open in Explorer" Click="OpenInExplorer" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" />
+            <Button x:Name="RefreshButton" Content="Refresh" Click="RefreshLogs" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" />
+            <Button x:Name="AutoScrollToggle" Content="Auto-Scroll: On" Click="ToggleAutoScroll" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" />
+            <Button x:Name="ClearLogButton" Content="Clear" Click="ClearLogs" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" />
+            <Button x:Name="CloseButton" Content="Close" Click="CloseWindow" Style="{StaticResource SecondaryButton}" />
+        </StackPanel>
+    </Grid>
+</Window>

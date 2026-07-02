@@ -1,0 +1,101 @@
+<Window x:Class="LlamaMate.App.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="LlamaMate Server Settings"
+        Height="550" Width="500"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/llama.ico">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Server Settings" Style="{StaticResource SectionHeader}" />
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- Profile -->
+                <GroupBox Header="Quick Profile" Margin="0,0,0,12">
+                    <StackPanel>
+                        <ComboBox x:Name="ProfileCombo" SelectedIndex="1" Margin="0,4,0,0">
+                            <ComboBoxItem Content="Fast (CPU, small context)" />
+                            <ComboBoxItem Content="Balanced" />
+                            <ComboBoxItem Content="Accurate (GPU, large context)" />
+                        </ComboBox>
+                        <TextBlock x:Name="ProfileDescription" Text="" Foreground="#666" FontSize="11" Margin="0,4,0,0" />
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- GPU -->
+                <GroupBox Header="GPU Acceleration" Margin="0,0,0,12">
+                    <StackPanel>
+                        <Label Content="GPU Layers:" />
+                        <Slider x:Name="GpuLayersSlider" Minimum="0" Maximum="99" Value="0" TickFrequency="1" IsSnapToTickEnabled="True"
+                                Margin="0,4,0,0" />
+                        <TextBlock x:Name="GpuLayersValue" Text="0 (CPU only)" Foreground="#666" FontSize="11" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Context -->
+                <GroupBox Header="Context &amp; Memory" Margin="0,0,0,12">
+                    <StackPanel>
+                        <Label Content="Context Size:" />
+                        <ComboBox x:Name="ContextCombo" Margin="0,4,0,0" SelectedIndex="1">
+                            <ComboBoxItem Content="2048" />
+                            <ComboBoxItem Content="4096" />
+                            <ComboBoxItem Content="8192" />
+                            <ComboBoxItem Content="16384" />
+                            <ComboBoxItem Content="32768" />
+                        </ComboBox>
+
+                        <Label Content="Batch Size:" Margin="0,8,0,0" />
+                        <TextBox x:Name="BatchSizeText" Text="512" Height="24" Margin="0,4,0,0" />
+
+                        <CheckBox x:Name="FlashAttentionCheck" Content="Flash Attention" Margin="0,12,0,0" />
+
+                        <Label Content="KV Cache Quantization:" Margin="0,8,0,0" />
+                        <ComboBox x:Name="KvCacheCombo" Margin="0,4,0,0" SelectedIndex="0">
+                            <ComboBoxItem Content="f16" />
+                            <ComboBoxItem Content="q8_0" />
+                            <ComboBoxItem Content="q4_0" />
+                        </ComboBox>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Network -->
+                <GroupBox Header="Network" Margin="0,0,0,12">
+                    <StackPanel>
+                        <Label Content="Port:" />
+                        <TextBox x:Name="PortText" Text="8080" Height="24" Margin="0,4,0,0" />
+
+                        <Label Content="Host:" Margin="0,8,0,0" />
+                        <TextBox x:Name="HostText" Text="127.0.0.1" Height="24" Margin="0,4,0,0" />
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- CPU Threads -->
+                <GroupBox Header="CPU Threads" Margin="0,0,0,12">
+                    <StackPanel>
+                        <Label Content="Threads (0 = auto):" />
+                        <TextBox x:Name="ThreadsText" Text="0" Height="24" Margin="0,4,0,0" />
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- RAM Estimate -->
+                <Border BorderBrush="#DDD" BorderThickness="1" Padding="8" CornerRadius="4" Background="#FFF8E1" Margin="0,0,0,12">
+                    <TextBlock x:Name="RamEstimate" Text="RAM estimate will appear here" Foreground="#666" FontSize="12" />
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="ApplyButton" Content="Apply &amp; Restart Server" Click="ApplyAndRestart" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" />
+            <Button x:Name="CancelButton" Content="Cancel" Click="Cancel_Click" Style="{StaticResource SecondaryButton}" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,125 @@
+<Window x:Class="LlamaMate.App.Views.ModelsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="LlamaMate Models"
+        Height="600" Width="800"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/llama.ico">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Models" Style="{StaticResource SectionHeader}" />
+
+        <TabControl Grid.Row="1">
+            <TabItem Header="Active">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Current Model" FontWeight="SemiBold" Margin="0,0,0,8" />
+
+                    <Border Grid.Row="1" BorderBrush="#DDD" BorderThickness="1" Padding="12" CornerRadius="4" Background="#F9F9F9">
+                        <StackPanel>
+                            <TextBlock x:Name="ActiveModelName" Text="No model selected" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ActiveModelSize" Text="" FontSize="12" Foreground="#666" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0" HorizontalAlignment="Right">
+                        <Button x:Name="BrowseActiveButton" Content="Browse to Model..." Click="BrowseActiveModel" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" />
+                        <Button x:Name="ClearActiveButton" Content="Clear" Click="ClearActiveModel" Style="{StaticResource SecondaryButton}" />
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Browse">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <ComboBox x:Name="BrowseSource" SelectedIndex="0" Width="180" Margin="0,0,8,0">
+                            <ComboBoxItem Content="Shortlist" />
+                            <ComboBoxItem Content="Search Hugging Face" />
+                        </ComboBox>
+                        <TextBox x:Name="SearchQuery" Width="250" Margin="0,0,8,0" />
+                        <Button x:Name="SearchButton" Content="Search" Click="SearchModels" Style="{StaticResource PrimaryButton}" />
+                    </StackPanel>
+
+                    <DataGrid x:Name="ModelsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              SelectionMode="Single" SelectionUnit="FullRow"
+                              MouseDoubleClick="ModelsGrid_DoubleClick">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Model ID" Binding="{Binding Id}" Width="*" />
+                            <DataGridTextColumn Header="Downloads" Binding="{Binding Downloads}" Width="100" />
+                            <DataGridTextColumn Header="Likes" Binding="{Binding Likes}" Width="80" />
+                            <DataGridTextColumn Header="Files" Binding="{Binding FileCount}" Width="80" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Installed">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Downloaded Models" FontWeight="SemiBold" Margin="0,0,0,8" />
+
+                    <DataGrid x:Name="InstalledGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                              SelectionMode="Single" SelectionUnit="FullRow">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Filename" Binding="{Binding Name}" Width="*" />
+                            <DataGridTextColumn Header="Size" Binding="{Binding SizeDisplay}" Width="100" />
+                            <DataGridTextColumn Header="Active" Binding="{Binding IsActive}" Width="80" />
+                        </DataGrid.Columns>
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Make Active" Click="InstalledContext_MakeActive" />
+                                <MenuItem Header="Open File Location" Click="InstalledContext_OpenLocation" />
+                                <Separator />
+                                <MenuItem Header="Delete" Click="InstalledContext_Delete" />
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                    </DataGrid>
+
+                    <Button x:Name="RefreshInstalledButton" Grid.Row="2" Content="Refresh" Click="RefreshInstalled" Style="{StaticResource SecondaryButton}" Margin="0,8,0,0" HorizontalAlignment="Right" />
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Install from URL">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Download a GGUF model from any URL" FontWeight="SemiBold" Margin="0,0,0,8" />
+
+                    <StackPanel Grid.Row="1">
+                        <Label Content="Model URL:" />
+                        <TextBox x:Name="InstallUrl" Height="24" Margin="0,0,0,8" />
+                        <TextBlock x:Name="InstallStatus" Text="" Foreground="#666" FontSize="12" Margin="0,0,0,8" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="DownloadFromUrlButton" Content="Download" Click="DownloadFromUrl" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" />
+                        <Button x:Name="CancelUrlButton" Content="Cancel" Click="CancelUrlDownload" Style="{StaticResource SecondaryButton}" />
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>

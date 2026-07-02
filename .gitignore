@@ -1,0 +1,33 @@
+# Build outputs
+bin/
+obj/
+packaging/output/
+packaging/cert/*.pfx
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Build artifacts
+src/LlamaMate.App/bin/
+src/LlamaMate.App/obj/
+
+# NuGet
+packages/
+*.nupkg
+
+# MSIX
+*.msix
+*.msix.sha256
