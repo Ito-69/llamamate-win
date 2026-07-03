@@ -15,6 +15,8 @@ public partial class App : Application
     private ModelsWindow? _modelsWindow;
     private SettingsWindow? _settingsWindow;
     private LogViewerWindow? _logViewerWindow;
+    private bool? _lastRunningState;
+    private string? _lastActiveModel;
 
     public ServerManager ServerManager { get; }
     public ConfigManager ConfigManager { get; }
@@ -76,6 +78,14 @@ public partial class App : Application
         }
 
         CreateTrayIcon();
+
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2)
+        };
+        timer.Tick += (_, _) => UpdateTrayStatus();
+        timer.Start();
+
         base.OnStartup(e);
     }
 
@@ -97,7 +107,7 @@ public partial class App : Application
 
         _trayIcon = new System.Windows.Forms.NotifyIcon
         {
-            Icon = CreateIcon(running: false),
+            Icon = CreateIcon(running: ServerManager.IsRunning),
             Text = "LlamaMate",
             ContextMenuStrip = _trayMenu,
             Visible = true
@@ -108,34 +118,41 @@ public partial class App : Application
             if (args.Button == System.Windows.Forms.MouseButtons.Left)
                 OpenWebUI();
         };
+
+        UpdateTrayStatus();
     }
 
     private static System.Drawing.Icon CreateIcon(bool running)
     {
-        using (var stream = Assembly.GetExecutingAssembly()
-            .GetManifestResourceStream("LlamaMate.App.Assets.llama-cpp.png"))
+        var resourceName = running
+            ? "LlamaMate.App.Assets.llama-running.png"
+            : "LlamaMate.App.Assets.llama-stopped.png";
+
+        using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
         {
             if (stream != null)
             {
                 using (var img = System.Drawing.Image.FromStream(stream))
                 {
-                    var bmp = new System.Drawing.Bitmap(img, 32, 32);
-                    if (!running) ApplyGrayscale(bmp);
+                    var bmp = new System.Drawing.Bitmap(img);
                     var h = bmp.GetHicon();
                     var icon = (System.Drawing.Icon)System.Drawing.Icon.FromHandle(h).Clone();
                     bmp.Dispose();
-                    DeleteObject(h);
+                    DestroyIcon(h);
                     return icon;
                 }
             }
         }
 
-        using (var fallbackBmp = new System.Drawing.Bitmap(32, 32))
-        using (var g = System.Drawing.Graphics.FromImage(fallbackBmp))
+        // Fallback: programmatically draw an orange/gray circle
+        var fallback = new System.Drawing.Bitmap(32, 32);
+        using (var g = System.Drawing.Graphics.FromImage(fallback))
         {
             g.Clear(System.Drawing.Color.Transparent);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
             var brushColor = running
-                ? System.Drawing.Color.FromArgb(0, 120, 212)
+                ? System.Drawing.Color.FromArgb(255, 130, 54)
                 : System.Drawing.Color.FromArgb(160, 160, 160);
             using (var brush = new System.Drawing.SolidBrush(brushColor))
             using (var pen = new System.Drawing.Pen(System.Drawing.Color.White, 1.5f))
@@ -145,11 +162,46 @@ public partial class App : Application
                 g.DrawEllipse(pen, 4, 4, 24, 24);
                 g.DrawString("LM", font, System.Drawing.Brushes.White, 5, 5);
             }
-            var h = fallbackBmp.GetHicon();
+            var h = fallback.GetHicon();
             var icon = (System.Drawing.Icon)System.Drawing.Icon.FromHandle(h).Clone();
-            DeleteObject(h);
+            DestroyIcon(h);
             return icon;
         }
+    }
+
+    private static System.Drawing.Bitmap RenderIcon(System.Drawing.Bitmap source, bool running, int size)
+    {
+        var bmp = new System.Drawing.Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        bmp.SetResolution(96, 96);
+
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+            // Draw the source image scaled to size x size
+            g.DrawImage(source, 0, 0, size, size);
+
+            if (!running)
+            {
+                // Apply grayscale color matrix
+                var matrix = new System.Drawing.Imaging.ColorMatrix(new float[][]
+                {
+                    new float[] { 0.299f, 0.299f, 0.299f, 0, 0 },
+                    new float[] { 0.587f, 0.587f, 0.587f, 0, 0 },
+                    new float[] { 0.114f, 0.114f, 0.114f, 0, 0 },
+                    new float[] { 0,       0,       0,       1, 0 },
+                    new float[] { 0,       0,       0,       0, 1 }
+                });
+                var attrs = new System.Drawing.Imaging.ImageAttributes();
+                attrs.SetColorMatrix(matrix);
+                g.DrawImage(bmp, new System.Drawing.Rectangle(0, 0, size, size), 0, 0, size, size, System.Drawing.GraphicsUnit.Pixel, attrs);
+            }
+        }
+
+        return bmp;
     }
 
     private static void ApplyGrayscale(System.Drawing.Bitmap bmp)
@@ -171,8 +223,8 @@ public partial class App : Application
         }
     }
 
-    [System.Runtime.InteropServices.DllImport("gdi32.dll", SetLastError = true)]
-    private static extern bool DeleteObject(System.IntPtr hObject);
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(System.IntPtr hIcon);
 
     private void BuildTrayMenu()
     {
@@ -255,10 +307,26 @@ public partial class App : Application
     {
         if (_trayIcon == null || _trayMenu == null) return;
 
-        var status = ServerManager.IsRunning ? "running" : "stopped";
-        _trayIcon.Text = $"LlamaMate - {GetCurrentModelDisplay()} ({status})";
-        _trayIcon.Icon = CreateIcon(running: ServerManager.IsRunning);
-        RefreshTrayMenu();
+        var isRunning = ServerManager.IsRunning;
+        var activeModel = ConfigManager.Settings.ActiveModel;
+
+        if (_lastRunningState != isRunning || _lastActiveModel != activeModel)
+        {
+            _lastRunningState = isRunning;
+            _lastActiveModel = activeModel;
+
+            var status = isRunning ? "running" : "stopped";
+            _trayIcon.Text = $"LlamaMate - {GetCurrentModelDisplay()} ({status})";
+
+            var oldIcon = _trayIcon.Icon;
+            _trayIcon.Icon = CreateIcon(running: isRunning);
+            if (oldIcon != null)
+            {
+                try { oldIcon.Dispose(); } catch { }
+            }
+
+            RefreshTrayMenu();
+        }
     }
 
     private void RefreshTrayMenu()
@@ -343,7 +411,7 @@ public partial class App : Application
     {
         if (_modelsWindow == null || !_modelsWindow.IsVisible)
         {
-            _modelsWindow = new ModelsWindow(ConfigManager, ModelManager, HuggingFaceApi);
+            _modelsWindow = new ModelsWindow(ConfigManager, ModelManager, HuggingFaceApi, ServerManager);
             _modelsWindow.Closed += (_, _) => { UpdateTrayStatus(); };
         }
         _modelsWindow.Show();

@@ -12,7 +12,16 @@ public class ServerManager
     private Process? _serverProcess;
     private CancellationTokenSource? _cts;
 
-    public bool IsRunning => _serverProcess is { HasExited: false };
+    public bool IsRunning
+    {
+        get
+        {
+            // Check our own process first
+            if (_serverProcess is { HasExited: false }) return true;
+            // Also check if any llama-server.exe process is running
+            return Process.GetProcessesByName("llama-server").Any(p => !p.HasExited);
+        }
+    }
 
     public event EventHandler? StatusChanged;
 

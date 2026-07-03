@@ -15,24 +15,76 @@ public partial class ModelsWindow : Window
     private readonly ConfigManager _config;
     private readonly ModelManager _modelManager;
     private readonly HuggingFaceApi _hfApi;
+    private readonly ServerManager _serverManager;
 
     private readonly List<HfModel> _browseResults = new();
+    private readonly List<HfModel> _shortlist = new()
+    {
+        new HfModel { Id = "Qwen/Qwen2.5-1.5B-Instruct-GGUF", FileCount = 1 },
+        new HfModel { Id = "Qwen/Qwen2.5-3B-Instruct-GGUF", FileCount = 1 },
+        new HfModel { Id = "Qwen/Qwen2.5-7B-Instruct-GGUF", FileCount = 1 },
+        new HfModel { Id = "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF", FileCount = 1 },
+        new HfModel { Id = "Qwen/Qwen2.5-14B-Instruct-GGUF", FileCount = 1 },
+        new HfModel { Id = "Qwen/Qwen2.5-32B-Instruct-GGUF", FileCount = 1 },
+        new HfModel { Id = "google/gemma-2-9b-it-GGUF", FileCount = 1 },
+        new HfModel { Id = "microsoft/Phi-3.5-mini-instruct-GGUF", FileCount = 1 },
+        new HfModel { Id = "bartowski/Mistral-Nemo-Instruct-2407-GGUF", FileCount = 1 },
+        new HfModel { Id = "bartowski/deepseek-coder-6.7b-instruct-GGUF", FileCount = 1 }
+    };
 
-    public ModelsWindow(ConfigManager config, ModelManager modelManager, HuggingFaceApi hfApi)
+    public ModelsWindow(ConfigManager config, ModelManager modelManager, HuggingFaceApi hfApi, ServerManager serverManager)
     {
         InitializeComponent();
 
         _config = config;
         _modelManager = modelManager;
         _hfApi = hfApi;
+        _serverManager = serverManager;
 
-        Loaded += (_, _) => RefreshAll();
+        Loaded += async (_, _) =>
+        {
+            RefreshActiveModel();
+            RefreshInstalled();
+            RefreshShortlist();
+            await LoadShortlistMetadata();
+        };
     }
 
     private void RefreshAll()
     {
         RefreshActiveModel();
         RefreshInstalled();
+        RefreshShortlist();
+    }
+
+    private void RefreshShortlist()
+    {
+        ModelsGrid.ItemsSource = null;
+        ModelsGrid.ItemsSource = _shortlist;
+    }
+
+    private async Task LoadShortlistMetadata()
+    {
+        var tasks = _shortlist.Select(async model =>
+        {
+            var details = await _hfApi.GetModelDetails(model.Id);
+            if (details != null)
+            {
+                model.Downloads = details.Downloads;
+                model.Likes = details.Likes;
+                model.PipelineTag = details.PipelineTag;
+                model.LastModified = details.LastModified;
+            }
+            try
+            {
+                var files = await _hfApi.ListModelFiles(model.Id);
+                model.FileCount = files.Count;
+            }
+            catch { model.FileCount = 0; }
+        });
+
+        await Task.WhenAll(tasks);
+        RefreshShortlist();
     }
 
     private void RefreshActiveModel()
@@ -158,6 +210,27 @@ public partial class ModelsWindow : Window
         {
             _modelManager.SetActive(item.Name);
             RefreshAll();
+
+            if (_serverManager.IsRunning)
+            {
+                var result = MessageBox.Show(
+                    $"Active model changed to:\n{item.Name}\n\nRestart the server now to apply?",
+                    "Restart server?",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        _ = _serverManager.Restart();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Restart failed: {ex.Message}", "Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
         }
     }
 

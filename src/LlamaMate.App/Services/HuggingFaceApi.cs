@@ -48,6 +48,30 @@ public class HuggingFaceApi
         return result;
     }
 
+    public async Task<HfModel?> GetModelDetails(string modelId)
+    {
+        try
+        {
+            var url = $"https://huggingface.co/api/models/{modelId}";
+            var response = await _http.GetStringAsync(url);
+            var m = JsonConvert.DeserializeObject<JObject>(response);
+            if (m == null) return null;
+
+            return new HfModel
+            {
+                Id = modelId,
+                Downloads = m["downloads"]?.Value<long>() ?? 0,
+                Likes = m["likes"]?.Value<int>() ?? 0,
+                PipelineTag = m["pipeline_tag"]?.ToString() ?? "",
+                LastModified = m["lastModified"]?.ToString() ?? ""
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<List<HfFile>> ListModelFiles(string modelId)
     {
         var url = $"https://huggingface.co/api/models/{modelId}/tree/main";
